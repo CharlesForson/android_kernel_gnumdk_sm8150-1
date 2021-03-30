@@ -193,3 +193,4 @@ obj-$(CONFIG_GNSS_SIRF)		+= gnsssirf/
 obj-$(CONFIG_GNSS)		+= gnss/
 
 obj-y  += param_read_write/
+obj-y  += oneplus/
