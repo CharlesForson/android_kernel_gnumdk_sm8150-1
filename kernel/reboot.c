@@ -16,8 +16,6 @@
 #include <linux/syscalls.h>
 #include <linux/syscore_ops.h>
 #include <linux/uaccess.h>
-#include <linux/delay.h>
-#include <linux/oem_force_dump.h>
 
 /*
  * this indicates whether you can reboot with ctrl-alt-del: the default is yes
