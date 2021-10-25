@@ -66,7 +66,6 @@
 #include <linux/sysfs.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/cpu_input_boost.h>
 #include <linux/devfreq_boost.h>
 #include <drm/drm_mipi_dsi.h>
 extern int msm_drm_notifier_call_chain(unsigned long val, void *v);
