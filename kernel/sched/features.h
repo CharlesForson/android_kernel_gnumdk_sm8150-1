@@ -137,3 +137,10 @@
  * RT class.
  */
 #define SCHED_FEAT_SCHEDTUNE_BOOST_HOLD_ALL 0
+
+/*
+ * https://lore.kernel.org/all/20210412102001.611897312@infradead.org/T/#u
+ */
+
+#define SCHED_FEAT_ALT_PERIOD 1
+#define SCHED_FEAT_BASE_SLICE 1
