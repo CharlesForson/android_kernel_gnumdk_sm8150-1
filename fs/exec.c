@@ -71,6 +71,10 @@
 #include "internal.h"
 
 #include <trace/events/sched.h>
+#include <linux/oem/im.h>
+#ifdef CONFIG_ADJ_CHAIN
+#include <linux/oem/adj_chain.h>
+#endif
 
 int suid_dumpable = 0;
 
@@ -311,7 +315,7 @@ static int __bprm_mm_init(struct linux_binprm *bprm)
 	vma->vm_start = vma->vm_end - PAGE_SIZE;
 	vma->vm_flags = VM_SOFTDIRTY | VM_STACK_FLAGS | VM_STACK_INCOMPLETE_SETUP;
 	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
-	INIT_LIST_HEAD(&vma->anon_vma_chain);
+	INIT_VMA(vma);
 
 	err = insert_vm_struct(mm, vma);
 	if (err)
@@ -1160,6 +1164,12 @@ static int de_thread(struct task_struct *tsk)
 		list_replace_rcu(&leader->tasks, &tsk->tasks);
 		list_replace_init(&leader->sibling, &tsk->sibling);
 
+#ifdef CONFIG_ADJ_CHAIN
+		tsk->adj_chain_status |= 1 << AC_PROM_LEADER;
+		adj_chain_detach(tsk);
+		adj_chain_attach(tsk);
+		tsk->adj_chain_status &= ~(1 << AC_PROM_LEADER);
+#endif
 		tsk->group_leader = tsk;
 		leader->group_leader = tsk;
 
@@ -1248,6 +1258,7 @@ void __set_task_comm(struct task_struct *tsk, const char *buf, bool exec)
 	task_lock(tsk);
 	trace_task_rename(tsk, buf);
 	strlcpy(tsk->comm, buf, sizeof(tsk->comm));
+	im_wmi(tsk);
 	task_unlock(tsk);
 	perf_event_comm(tsk, exec);
 }
@@ -1318,7 +1329,7 @@ EXPORT_SYMBOL(flush_old_exec);
 void would_dump(struct linux_binprm *bprm, struct file *file)
 {
 	struct inode *inode = file_inode(file);
-	if (inode_permission(inode, MAY_READ) < 0) {
+	if (inode_permission2(file->f_path.mnt, inode, MAY_READ) < 0) {
 		struct user_namespace *old, *user_ns;
 		bprm->interp_flags |= BINPRM_FLAGS_ENFORCE_NONDUMP;
 
@@ -1699,6 +1710,8 @@ static int exec_binprm(struct linux_binprm *bprm)
 		ptrace_event(PTRACE_EVENT_EXEC, old_vpid);
 		proc_exec_connector(current);
 	}
+	if (strcmp(current->comm, "surfaceflinger") == 0)
+		current->compensate_need = 2;
 
 	return ret;
 }

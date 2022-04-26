@@ -81,7 +81,7 @@ static void read_cache_pages_invalidate_pages(struct address_space *mapping,
  * Hides the details of the LRU cache etc from the filesystems.
  */
 int read_cache_pages(struct address_space *mapping, struct list_head *pages,
-			int (*filler)(void *, struct page *), void *data)
+			int (*filler)(struct file *, struct page *), void *data)
 {
 	struct page *page;
 	int ret = 0;
@@ -513,7 +513,9 @@ void page_cache_sync_readahead(struct address_space *mapping,
 		force_page_cache_readahead(mapping, filp, offset, req_size);
 		return;
 	}
-
+#ifdef CONFIG_MEMPLUS
+	count_vm_event(PGCACHEMISS);
+#endif
 	/* do read-ahead */
 	ondemand_readahead(mapping, ra, filp, false, offset, req_size);
 }

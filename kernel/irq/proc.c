@@ -165,6 +165,11 @@ static ssize_t write_irq_affinity(int type, struct file *file,
 		goto free_cpumask;
 	}
 
+	if (cpumask_subset(new_value, cpu_isolated_mask)) {
+		err = -EINVAL;
+		goto free_cpumask;
+	}
+
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
 	 * way to make the system unusable accidentally :-) At least
@@ -543,6 +548,8 @@ int show_interrupts(struct seq_file *p, void *v)
 	struct irqaction *action;
 	struct irq_desc *desc;
 
+	unsigned long irq_flags;
+
 	if (i > ACTUAL_NR_IRQS)
 		return 0;
 
@@ -587,11 +594,17 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_printf(p, " %8s", "None");
 	}
 	if (desc->irq_data.domain)
-		seq_printf(p, " %*d", prec, (int) desc->irq_data.hwirq);
+		seq_printf(p, " %*d", prec,  (int)desc->irq_data.hwirq);
 	else
 		seq_printf(p, " %*s", prec, "");
 #ifdef CONFIG_GENERIC_IRQ_SHOW_LEVEL
-	seq_printf(p, " %-8s", irqd_is_level_type(&desc->irq_data) ? "Level" : "Edge");
+	irq_flags = irqd_get_trigger_type(&desc->irq_data);
+	if (irq_flags & IRQ_TYPE_LEVEL_MASK)
+		seq_printf(p, " %-8s", "Level");
+	else if (irq_flags & IRQ_TYPE_EDGE_BOTH)
+		seq_printf(p, " %-8s", "Edge");
+	else
+		seq_printf(p, " %-8s", "None");
 #endif
 	if (desc->name)
 		seq_printf(p, "-%-8s", desc->name);

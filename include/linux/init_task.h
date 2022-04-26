@@ -81,6 +81,7 @@ extern struct fs_struct init_fs;
 	INIT_PREV_CPUTIME(sig)						\
 	.cred_guard_mutex =						\
 		 __MUTEX_INITIALIZER(sig.cred_guard_mutex),		\
+	INIT_RECLAIM_STATE						\
 }
 
 extern struct nsproxy init_nsproxy;
@@ -236,6 +237,7 @@ extern struct cred init_cred;
 	.policy		= SCHED_NORMAL,					\
 	.cpus_allowed	= CPU_MASK_ALL,					\
 	.nr_cpus_allowed= NR_CPUS,					\
+	.cpus_requested	= CPU_MASK_ALL,					\
 	.mm		= NULL,						\
 	.active_mm	= &init_mm,					\
 	.restart_block = {						\
