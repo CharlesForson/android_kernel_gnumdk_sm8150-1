@@ -32,6 +32,7 @@
 #include <linux/ctype.h>
 #include <linux/mm.h>
 #include <linux/ion.h>
+#include <linux/log2.h>
 #include <asm/cacheflush.h>
 #include <uapi/linux/sched/types.h>
 #include <soc/qcom/boot_stats.h>
@@ -2306,22 +2307,22 @@ static int check_vma_flags(struct vm_area_struct *vma,
 
 static int check_vma(unsigned long hostptr, u64 size)
 {
-	struct vm_area_struct *vma;
-	unsigned long cur = hostptr;
+    struct vm_area_struct *vma;
+    unsigned long cur = hostptr;
 
-	while (cur < (hostptr + size)) {
-		vma = find_vma(current->mm, cur);
-		if (!vma)
-			return false;
+    while (cur < (hostptr + size)) {
+        vma = find_vma(current->mm, cur);
+        if (!vma)
+            return false;
 
-		/* Don't remap memory that we already own */
-		if (vma->vm_file && vma->vm_file->f_op == &kgsl_fops)
-			return false;
+        /* Don't remap memory that we already own */
+        if (vma->vm_file && vma->vm_file->f_op == &kgsl_fops)
+            return false;
 
-		cur = vma->vm_end;
-	}
+        cur = vma->vm_end;
+    }
 
-	return true;
+    return true;
 }
 
 static int memdesc_sg_virt(struct kgsl_memdesc *memdesc, unsigned long useraddr)
@@ -2356,7 +2357,7 @@ static int memdesc_sg_virt(struct kgsl_memdesc *memdesc, unsigned long useraddr)
 	npages = get_user_pages(useraddr, sglen, write, pages, NULL);
 	up_read(&current->mm->mmap_sem);
 
-	ret = (npages < 0) ? (int)npages : 0;
+    ret = (npages < 0) ? (int)npages : 0;
 	if (ret)
 		goto out;
 
@@ -4632,6 +4633,7 @@ static unsigned long _get_svm_area(struct kgsl_process_private *private,
 	uint64_t align;
 	unsigned long result;
 	unsigned long addr;
+	uint64_t svm_start, svm_end;
 
 	if (align_shift >= ilog2(SZ_2M))
 		align = SZ_2M;
@@ -4648,6 +4650,9 @@ static unsigned long _get_svm_area(struct kgsl_process_private *private,
 	if (kgsl_mmu_svm_range(private->pagetable, &start, &end,
 				entry->memdesc.flags))
 		return -ERANGE;
+
+	svm_start = start;
+	svm_end = end;
 
 	/* now clamp the range based on the CPU's requirements */
 	start = max_t(uint64_t, start, mmap_min_addr);
@@ -4731,12 +4736,13 @@ kgsl_get_unmapped_area(struct file *file, unsigned long addr,
 				pgoff, len, (int) val);
 	} else {
 		val = _get_svm_area(private, entry, addr, len, flags);
-		if (IS_ERR_VALUE(val))
+		if (IS_ERR_VALUE(val)) {
 			KGSL_DRV_ERR_RATELIMIT(device,
 				"_get_svm_area: pid %d mmap_base %lx addr %lx pgoff %lx len %ld failed error %d\n",
 				pid_nr(private->pid),
 				current->mm->mmap_base, addr,
 				pgoff, len, (int) val);
+		}
 	}
 
 put:
