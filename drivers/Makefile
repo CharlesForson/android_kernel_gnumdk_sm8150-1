@@ -194,3 +194,4 @@ obj-$(CONFIG_GNSS)		+= gnss/
 
 obj-y  += param_read_write/
 obj-y  += oneplus/
+obj-$(CONFIG_AW8697_HAPTIC) += vibrator/
