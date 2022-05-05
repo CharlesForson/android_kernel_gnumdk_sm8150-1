@@ -228,4 +228,6 @@ source "drivers/esoc/Kconfig"
 source "drivers/oneplus/Kconfig"
 
 source "drivers/vibrator/Kconfig"
+
+source "drivers/tri_state_key/Kconfig"
 endmenu
