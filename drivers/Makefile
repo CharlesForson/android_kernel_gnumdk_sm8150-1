@@ -197,3 +197,4 @@ obj-y  += oneplus/
 obj-$(CONFIG_AW8697_HAPTIC) += vibrator/
 obj-$(CONFIG_TRI_STATE_KEY)     += tri_state_key/
 obj-y  += step_motor/
+obj-y += infrared_proximity/infrared_power_control.o
