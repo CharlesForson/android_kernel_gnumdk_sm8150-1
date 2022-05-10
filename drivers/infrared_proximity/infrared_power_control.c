@@ -214,53 +214,6 @@ static irqreturn_t oneplus_infrared_detect_handler (int irq, void *dev_id)
   return IRQ_HANDLED;
 }
 
-
-static void oneplus_infrared_interrupt_register (struct oneplus_infrared_state *state)
-{
-  struct device_node *np = NULL;
-  int err = 0;
-
-  np = state->dev->of_node;
-
-  state->pctrl = devm_pinctrl_get (state->dev);
-  if (IS_ERR (state->pctrl)) {
-    INFRARED_ERR ("failed to get pinctrl \n");
-    return;
-  };
-
-  state->shutdown_state = pinctrl_lookup_state (state->pctrl, "infrared_input");\
-
-  if (IS_ERR (state->shutdown_state)) {
-    err = PTR_ERR (state->shutdown_state);
-    INFRARED_ERR ("pinctrl_lookup_state failed, err : %d \n", err);
-    return;
-  };
-
-  pinctrl_select_state (state->pctrl, state->shutdown_state);
-  state->infrared_gpio = of_get_named_gpio (np, "infrared,irq-gpio", 0);
-
-  if (!gpio_is_valid (state->infrared_gpio)) {
-    INFRARED_LOG ("gpio not specified \n");
-  } else {
-    err = gpio_request (state->infrared_gpio, "infrared-irq-gpio");
-    if (err)
-      INFRARED_LOG ("request infrared_gpio gpio failed, err : %d \n", err);
-
-    err = gpio_direction_input (state->infrared_gpio);
-    msleep (50);
-    state->infrared_irq = gpio_to_irq (state->infrared_gpio);
-
-    if (request_irq(state->infrared_irq, &oneplus_infrared_detect_handler, IRQ_TYPE_EDGE_RISING, "infrared", NULL)) {
-      INFRARED_ERR ("IRQ LINE NOT AVAILABLE!!\n");
-      return;
-    }
-    irq_set_irq_wake (state->infrared_irq, 1);
-  }
-
-  INFRARED_LOG ("gpio %d irq:%d \n", state->infrared_gpio, state->infrared_irq);
-}
-
-
 static int infrared_platform_probe(struct platform_device* pdev)
 {
 	struct oneplus_infrared_state* p_infrared_state = NULL;
@@ -308,8 +261,6 @@ static int infrared_platform_probe(struct platform_device* pdev)
 	}
 
 	oneplus_parameter_init(p_infrared_state);
-
-  oneplus_infrared_interrupt_register(p_infrared_state);
 
   INIT_DELAYED_WORK(&p_infrared_state->infrared_irq_check_work, infrared_irq_check_work_func);
 
