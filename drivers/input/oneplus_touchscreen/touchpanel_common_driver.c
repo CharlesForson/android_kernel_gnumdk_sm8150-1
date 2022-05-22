@@ -33,26 +33,10 @@
 /*******Part0:LOG TAG Declear************************/
 #define TPD_PRINT_POINT_NUM 150
 #define TPD_DEVICE "touchpanel"
-#define TPD_INFO(a, arg...)  pr_err("[TP]"TPD_DEVICE ": " a, ##arg)
-#define TPD_DEBUG(a, arg...)\
-    do{\
-        if (LEVEL_DEBUG == tp_debug)\
-            pr_err("[TP]"TPD_DEVICE ": " a, ##arg);\
-    }while(0)
-
-#define TPD_DETAIL(a, arg...)\
-    do{\
-        if (LEVEL_BASIC != tp_debug)\
-            pr_err("[TP]"TPD_DEVICE ": " a, ##arg);\
-    }while(0)
-
-#define TPD_SPECIFIC_PRINT(count, a, arg...)\
-    do{\
-        if (count++ == TPD_PRINT_POINT_NUM || LEVEL_DEBUG == tp_debug) {\
-            TPD_INFO(TPD_DEVICE ": " a, ##arg);\
-            count = 0;\
-        }\
-    }while(0)
+#define TPD_INFO(a, arg...)
+#define TPD_DEBUG(a, arg...)
+#define TPD_DETAIL(a, arg...)
+#define TPD_SPECIFIC_PRINT(count, a, arg...)
 
 /*******Part1:Global variables Area********************/
 unsigned int tp_debug = 0;
@@ -4560,13 +4544,7 @@ int register_common_touch_device(struct touchpanel_data *pdata)
     if (ret) {
         TPD_INFO("Unable to register fb_notifier: %d\n", ret);
     }
-#elif defined(CONFIG_FB)
-    ts->fb_notif.notifier_call = fb_notifier_callback;
-    ret = fb_register_client(&ts->fb_notif);
-    if (ret) {
-        TPD_INFO("Unable to register fb_notifier: %d\n", ret);
-    }
-#endif/*CONFIG_FB*/
+#endif
 
     //step15 : workqueue create(speedup_resume)
     ts->speedup_resume_wq = create_singlethread_workqueue("speedup_resume_wq");

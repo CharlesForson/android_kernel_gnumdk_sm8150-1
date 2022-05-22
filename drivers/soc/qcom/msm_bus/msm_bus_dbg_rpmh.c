@@ -1,4 +1,4 @@
-/* Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -333,13 +333,14 @@ static struct dentry *msm_bus_dbg_create(const char *name, mode_t mode,
 	struct dentry *dent, uint32_t clid)
 {
 	if (dent == NULL) {
-		MSM_BUS_DBG("debugfs not ready yet\n");
+		MSM_BUS_ERR("debugfs not ready yet\n");
 		return NULL;
 	}
 	return debugfs_create_file(name, mode, dent, (void *)(uintptr_t)clid,
 		&client_data_fops);
 }
 
+#if 0
 int msm_bus_dbg_add_client(const struct msm_bus_client_handle *pdata)
 
 {
@@ -348,6 +349,7 @@ int msm_bus_dbg_add_client(const struct msm_bus_client_handle *pdata)
 		MSM_BUS_DBG("Failed to allocate memory for client data\n");
 		return -ENOMEM;
 	}
+	memset(dbg_cldata1, 0, sizeof(struct msm_bus_cldata));
 	dbg_cldata1->handle = pdata;
 	rt_mutex_lock(&msm_bus_dbg_cllist_lock);
 	list_add_tail(&dbg_cldata1->list, &cl_list);
@@ -455,6 +457,7 @@ void msm_bus_dbg_remove_bcm(struct msm_bus_node_device_type *cur_bcm)
 	list_del_init(&cur_bcm->dbg_link);
 	rt_mutex_unlock(&msm_bus_dbg_cllist_lock);
 }
+#endif
 
 static int msm_bus_dbg_record_client(const struct msm_bus_scale_pdata *pdata,
 	int index, uint32_t clid, struct dentry *file)
@@ -464,6 +467,7 @@ static int msm_bus_dbg_record_client(const struct msm_bus_scale_pdata *pdata,
 		MSM_BUS_DBG("Failed to allocate memory for client data\n");
 		return -ENOMEM;
 	}
+	memset(dbg_cldata2, 0, sizeof(struct msm_bus_cldata));
 	dbg_cldata2->pdata = pdata;
 	dbg_cldata2->index = index;
 	dbg_cldata2->clid = clid;
@@ -595,7 +599,7 @@ static ssize_t  msm_bus_dbg_update_request_write(struct file *file,
 	}
 	dbg_buf[cnt] = '\0';
 	chid = dbg_buf;
-	MSM_BUS_DBG("buffer: %s\n size: %zu\n", dbg_buf, sizeof(ubuf));
+	MSM_BUS_DBG("buffer: %s\n size: %zu\n", dbg_buf, sizeof(dbg_buf));
 
 	rt_mutex_lock(&msm_bus_dbg_cllist_lock);
 	list_for_each_entry(cldata, &cl_list, list) {
@@ -908,6 +912,7 @@ static const struct file_operations msm_bus_dbg_dump_clients_fops = {
 	.read		= msm_bus_dbg_dump_clients_read,
 };
 
+#if 0
 /**
  * msm_bus_dbg_client_data() - Add debug data for clients
  * @pdata: Platform data of the client
@@ -956,6 +961,7 @@ void msm_bus_dbg_commit_data(const char *fabname, void *cdata,
 			nslaves, ntslaves);
 }
 EXPORT_SYMBOL(msm_bus_dbg_commit_data);
+#endif
 
 static int __init msm_bus_debugfs_init(void)
 {

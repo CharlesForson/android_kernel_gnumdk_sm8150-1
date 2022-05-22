@@ -2627,7 +2627,7 @@ bool ipa_has_open_aggr_frame(enum ipa_client_type client)
 
 int ipa_mhi_resume_channels_internal(enum ipa_client_type client,
 		bool LPTransitionRejected, bool brstmode_enabled,
-		union __packed gsi_channel_scratch ch_scratch, u8 index,
+		union gsi_channel_scratch ch_scratch, u8 index,
 		bool is_switch_to_dbmode)
 {
 	int ret;
@@ -3845,8 +3845,8 @@ int ipa_qdss_disconn_pipes(void)
 EXPORT_SYMBOL(ipa_qdss_disconn_pipes);
 
 static const struct dev_pm_ops ipa_pm_ops = {
-	.suspend_noirq = ipa_ap_suspend,
-	.resume_noirq = ipa_ap_resume,
+	.suspend_late = ipa_ap_suspend,
+	.resume_early = ipa_ap_resume,
 };
 
 static struct platform_driver ipa_plat_drv = {

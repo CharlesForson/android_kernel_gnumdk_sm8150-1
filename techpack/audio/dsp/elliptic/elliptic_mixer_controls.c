@@ -217,7 +217,7 @@ void elliptic_set_calibration_data(uint8_t *calib_data, size_t size)
 			calib_data, size);
 	}
 	if (calibration_obj == NULL) {
-		EL_PRINT_E(
+		EL_PRINT_D(
 			"ell..set_calibration_data() calib=NULL (%zu)", size);
 		return;
 	}
@@ -233,7 +233,7 @@ void elliptic_set_diagnostics_data(uint8_t *diag_data, size_t size)
 			elliptic_get_shared_obj(
 				ELLIPTIC_OBJ_ID_DIAGNOSTICS_DATA);
 		if (diagnostics_obj == NULL) {
-			EL_PRINT_E("el..set_diagnostics_data() NULL (%zu)",
+			EL_PRINT_D("el..set_diagnostics_data() NULL (%zu)",
 				size);
 			return;
 		}
@@ -362,7 +362,7 @@ int elliptic_ultrasound_tx_port_set(struct snd_kcontrol *kcontrol,
 	int ret;
 
 	if (ultrasound_tx_port_cache == ucontrol->value.integer.value[0]) {
-		EL_PRINT_E("ultrasound_tx_port_set: ignoring duplicate request");
+		EL_PRINT_D("ultrasound_tx_port_set: ignoring duplicate request");
 		return 0;
 	}
 
@@ -372,7 +372,7 @@ int elliptic_ultrasound_tx_port_set(struct snd_kcontrol *kcontrol,
 	else
 		ret = elliptic_close_port(ULTRASOUND_TX_PORT_ID);
 
-	EL_PRINT_E("ultrasound_tx_port: enable=%d ret=%d",
+	EL_PRINT_D("ultrasound_tx_port: enable=%d ret=%d",
 		ultrasound_tx_port_cache, ret);
 
 	return ret;
@@ -393,7 +393,7 @@ int elliptic_ultrasound_rx_port_set(struct snd_kcontrol *kcontrol,
 	int ret;
 
 	if (ultrasound_rx_port_cache == ucontrol->value.integer.value[0]) {
-		EL_PRINT_E("ultrasound_rx_port_set: ignoring duplicate request");
+		EL_PRINT_D("ultrasound_rx_port_set: ignoring duplicate request");
 		return 0;
 	}
 
@@ -403,7 +403,7 @@ int elliptic_ultrasound_rx_port_set(struct snd_kcontrol *kcontrol,
 	else
 		ret = elliptic_close_port(ULTRASOUND_RX_PORT_ID);
 
-	EL_PRINT_E("ultrasound_rx_port: enable=%d ret=%d",
+	EL_PRINT_D("ultrasound_rx_port: enable=%d ret=%d",
 		ultrasound_tx_port_cache, ret);
 
 	return 0;
@@ -495,7 +495,7 @@ int elliptic_calibration_v2_data_get(struct snd_kcontrol *kcontrol,
 		elliptic_get_shared_obj(ELLIPTIC_OBJ_ID_CALIBRATION_V2_DATA);
 
 	if (calibration_obj == NULL) {
-		EL_PRINT_E("calibration_obj is NULL");
+		EL_PRINT_D("calibration_obj is NULL");
 		return -EINVAL;
 	}
 
@@ -538,7 +538,7 @@ int elliptic_ml_data_get(struct snd_kcontrol *kcontrol,
 		elliptic_get_shared_obj(ELLIPTIC_OBJ_ID_ML_DATA);
 
 	if (ml_obj == NULL) {
-		EL_PRINT_E("ml_obj is NULL");
+		EL_PRINT_D("ml_obj is NULL");
 		return -EINVAL;
 	}
 
@@ -711,7 +711,7 @@ int elliptic_system_configuration_param_get(
 
 	if (mc->shift >= ELLIPTIC_SYSTEM_CONFIGURATION_CUSTOM_SETTING_0 &&
 		mc->shift <= ELLIPTIC_SYSTEM_CONFIGURATION_CUSTOM_SETTING_15){
-		EL_PRINT_E("get ELLIPTIC_SYSTEM_CONFIGURATION_CUSTOM_SETTING_%02d",
+		EL_PRINT_D("get ELLIPTIC_SYSTEM_CONFIGURATION_CUSTOM_SETTING_%02d",
 			mc->shift - ELLIPTIC_SYSTEM_CONFIGURATION_CUSTOM_SETTING_0);
 		ucontrol->value.integer.value[0] = 0;
 		return 1;
@@ -792,7 +792,7 @@ int elliptic_system_configuration_param_get(
 		break;
 
 	default:
-		EL_PRINT_E("Invalid mixer control");
+		EL_PRINT_D("Invalid mixer control");
 		return -EINVAL;
 	}
 
@@ -818,16 +818,16 @@ int elliptic_system_configuration_param_put(
 		const size_t csi =
 			mc->shift -
 			ELLIPTIC_SYSTEM_CONFIGURATION_CUSTOM_SETTING_0;
-		EL_PRINT_E("ELLIPTIC_SYSTEM_CONFIGURATION_CUSTOM_SETTING_XX csi:%zu", csi);
+		EL_PRINT_D("ELLIPTIC_SYSTEM_CONFIGURATION_CUSTOM_SETTING_XX csi:%zu", csi);
 		if (csi >=
 			ARRAY_SIZE(elliptic_system_configuration_cache.custom_settings))
 			return -EINVAL;
-		EL_PRINT_E("ucontrol->value.integer.value[0]:%ld", ucontrol->value.integer.value[0]);
+		EL_PRINT_D("ucontrol->value.integer.value[0]:%ld", ucontrol->value.integer.value[0]);
 		elliptic_system_configuration_cache.custom_settings[csi] =
 			ucontrol->value.integer.value[0];
 		param.type = ESCPT_ENGINE_CUSTOM_SETTING_0 + csi;
 		param.custom_setting = ucontrol->value.integer.value[0];
-		EL_PRINT_E("calling elliptic_data_write(custom_setting) csi:%zu", csi);
+		EL_PRINT_D("calling elliptic_data_write(custom_setting) csi:%zu", csi);
 		return elliptic_data_write(ELLIPTIC_ULTRASOUND_SET_PARAMS,
 				  (const char *)&param, sizeof(param));
 	}
@@ -1296,7 +1296,7 @@ unsigned int elliptic_add_platform_controls(void *platform)
 			ultrasound_filter_mixer_controls,
 			num_controls);
 	} else {
-		EL_PRINT_E("pointer is NULL");
+		EL_PRINT_D("pointer is NULL");
 	}
 
 	return num_controls;

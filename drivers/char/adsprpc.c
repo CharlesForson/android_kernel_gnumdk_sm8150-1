@@ -2844,9 +2844,7 @@ static int fastrpc_internal_munmap(struct fastrpc_file *fl,
 
 	VERIFY(err, fl->dsp_proc_init == 1);
 	if (err) {
-		pr_err("adsprpc: ERROR: %s: user application %s trying to unmap without initialization\n",
-			 __func__, current->comm);
-		err = -EBADR;
+		err = -EHOSTDOWN;
 		return err;
 	}
 	mutex_lock(&fl->internal_map_mutex);
@@ -2916,9 +2914,7 @@ static int fastrpc_internal_munmap_fd(struct fastrpc_file *fl,
 		return err;
 	VERIFY(err, fl->dsp_proc_init == 1);
 	if (err) {
-		pr_err("adsprpc: ERROR: %s: user application %s trying to unmap without initialization\n",
-			__func__, current->comm);
-		err = -EBADR;
+		err = -EHOSTDOWN;
 		return err;
 	}
 	mutex_lock(&fl->internal_map_mutex);
@@ -2953,9 +2949,7 @@ static int fastrpc_internal_mmap(struct fastrpc_file *fl,
 
 	VERIFY(err, fl->dsp_proc_init == 1);
 	if (err) {
-		pr_err("adsprpc: ERROR: %s: user application %s trying to map without initialization\n",
-			__func__, current->comm);
-		err = -EBADR;
+		err = -EHOSTDOWN;
 		return err;
 	}
 	mutex_lock(&fl->internal_map_mutex);
@@ -4672,12 +4666,14 @@ static struct platform_driver fastrpc_driver = {
 #ifdef CONFIG_PM_SLEEP
 		.pm = &fastrpc_pm,
 #endif
+		.probe_type = PROBE_FORCE_SYNCHRONOUS,
 	},
 };
 
 static const struct rpmsg_device_id fastrpc_rpmsg_match[] = {
 	{ FASTRPC_GLINK_GUID },
 	{ FASTRPC_SMD_GUID },
+	{ },
 };
 
 static const struct of_device_id fastrpc_rpmsg_of_match[] = {

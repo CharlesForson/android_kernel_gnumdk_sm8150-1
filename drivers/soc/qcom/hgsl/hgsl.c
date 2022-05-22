@@ -902,12 +902,6 @@ static int hgsl_dbq_init(struct file *filep, unsigned long arg)
 	}
 	WARN_ON(param.head_dwords < 2);
 
-	dbq_set_qindex((uint32_t *)dbq->vbase,
-				DBQ_WRITE_INDEX_IN_DWORD, 0);
-
-	dbq_set_qindex((uint32_t *)dbq->vbase,
-				DBQ_READ_INDEX_IN_DWORD, 0);
-
 	dbq->data.vaddr = dbq->vbase + (param.queue_off_dwords << 2);
 	dbq->data.dwords = param.queue_dwords;
 
@@ -984,7 +978,7 @@ static int hgsl_context_create(struct file *filep, unsigned long arg)
 		goto err_dma_put;
 	}
 
-	ctxt = kzalloc(sizeof(ctxt), GFP_KERNEL);
+	ctxt = kzalloc(sizeof(*ctxt), GFP_KERNEL);
 	if (ctxt == NULL) {
 		ret = -ENOMEM;
 		goto err_dma_unmap;
@@ -1122,7 +1116,7 @@ static int hgsl_wait_timestamp(struct file *filep, unsigned long arg)
 
 	kref_get(&ctxt->kref);
 
-	wait = kzalloc(sizeof(wait), GFP_KERNEL);
+	wait = kzalloc(sizeof(*wait), GFP_KERNEL);
 	if (!wait)
 		return -ENOMEM;
 

@@ -290,7 +290,7 @@ static enum tfa_error tfa98xx_tfa_start(struct tfa98xx *tfa98xx, int next_profil
 		start_time = ktime_get_boottime();
 	}
 
-	dev_info(&tfa98xx->i2c->dev, "tfa98xx_tfa_start enter\n");
+	dev_dbg(&tfa98xx->i2c->dev, "tfa98xx_tfa_start enter\n");
 
 	err = tfa_dev_start(tfa98xx->tfa, next_profile, vstep);
 
@@ -770,7 +770,7 @@ static ssize_t tfa98xx_dbgfs_dsp_state_set(struct file *file,
 		pr_debug("[0x%x] tfa_dev_stop complete: %d\n",  tfa98xx->i2c->addr, ret);
 	} else if (!strncmp(buf, mon_start_cmd, sizeof(mon_start_cmd) - 1)) {
 		pr_info("[0x%x] Manual start of monitor thread...\n",  tfa98xx->i2c->addr);
-		queue_delayed_work(tfa98xx->tfa98xx_wq,
+		queue_delayed_work(system_power_efficient_wq,
 					&tfa98xx->monitor_work, HZ);
 	} else if (!strncmp(buf, mon_stop_cmd, sizeof(mon_stop_cmd) - 1)) {
 		pr_info("[0x%x] Manual stop of monitor thread...\n",  tfa98xx->i2c->addr);
@@ -2248,7 +2248,7 @@ static void tfa98xx_tapdet_check_update(struct tfa98xx *tfa98xx)
 		/* interrupt not available, setup polling mode */
 		tfa98xx->tapdet_poll = true;
 		if (enable)
-			queue_delayed_work(tfa98xx->tfa98xx_wq,
+			queue_delayed_work(system_power_efficient_wq,
 						&tfa98xx->tapdet_work, HZ/10);
 		else
 			cancel_delayed_work_sync(&tfa98xx->tapdet_work);
@@ -2485,7 +2485,7 @@ static void tfa98xx_tapdet_work(struct work_struct *work)
 	if ( tfa_irq_get(tfa98xx->tfa, tfa9912_irq_sttapdet))
 		tfa98xx_tapdet(tfa98xx);
 
-	queue_delayed_work(tfa98xx->tfa98xx_wq, &tfa98xx->tapdet_work, HZ/10);
+	queue_delayed_work(system_power_efficient_wq, &tfa98xx->tapdet_work, HZ/10);
 }
 
 static void tfa98xx_monitor(struct work_struct *work)
@@ -2503,13 +2503,13 @@ static void tfa98xx_monitor(struct work_struct *work)
 		if (error == Tfa98xx_Error_DSP_not_running) {
 			if (tfa98xx->dsp_init == TFA98XX_DSP_INIT_DONE) {
 				tfa98xx->dsp_init = TFA98XX_DSP_INIT_RECOVER;
-				queue_delayed_work(tfa98xx->tfa98xx_wq, &tfa98xx->init_work, 0);
+				queue_delayed_work(system_power_efficient_wq, &tfa98xx->init_work, 0);
 			}
 		}
 	}
 
 	/* reschedule */
-	queue_delayed_work(tfa98xx->tfa98xx_wq, &tfa98xx->monitor_work, 5*HZ);
+	queue_delayed_work(system_power_efficient_wq, &tfa98xx->monitor_work, 5*HZ);
 }
 
 static void tfa98xx_dsp_init(struct tfa98xx *tfa98xx)
@@ -2553,7 +2553,7 @@ static void tfa98xx_dsp_init(struct tfa98xx *tfa98xx)
 
 			/* Subsystem ready, tfa init complete */
 			tfa98xx->dsp_init = TFA98XX_DSP_INIT_DONE;
-			dev_info(&tfa98xx->i2c->dev,
+			dev_dbg(&tfa98xx->i2c->dev,
 						"tfa_dev_start success (%d)\n",
 						tfa98xx->init_count);
 			/* cancel other pending init works */
@@ -2569,7 +2569,7 @@ static void tfa98xx_dsp_init(struct tfa98xx *tfa98xx)
 	}
 	if (reschedule) {
 		/* reschedule this init work for later */
-		queue_delayed_work(tfa98xx->tfa98xx_wq,
+		queue_delayed_work(system_power_efficient_wq,
 						&tfa98xx->init_work,
 						msecs_to_jiffies(5));
 		tfa98xx->init_count++;
@@ -2606,7 +2606,7 @@ static void tfa98xx_dsp_init(struct tfa98xx *tfa98xx)
 				 * needed.
 				 */
 				if (tfa98xx->tfa->tfa_family == 1)
-					queue_delayed_work(tfa98xx->tfa98xx_wq,
+					queue_delayed_work(system_power_efficient_wq,
 					                &tfa98xx->monitor_work,
 					                1*HZ);
 				mutex_unlock(&tfa98xx->dsp_lock);
@@ -2808,7 +2808,7 @@ static int tfa98xx_hw_params(struct snd_pcm_substream *substream,
 
 	/* Supported */
 	rate = params_rate(params);
-	pr_info("Requested rate: %d, sample size: %d, physical size: %d\n",
+	pr_debug("Requested rate: %d, sample size: %d, physical size: %d\n",
 			rate, snd_pcm_format_width(params_format(params)),
 			snd_pcm_format_physical_width(params_format(params)));
 
@@ -2821,7 +2821,7 @@ static int tfa98xx_hw_params(struct snd_pcm_substream *substream,
 		pr_err("tfa98xx: invalid sample rate %d.\n", rate);
 		return -EINVAL;
 	}
-	pr_info("mixer profile:container profile = [%d:%d]\n", tfa98xx_mixer_profile, prof_idx);
+	pr_debug("mixer profile:container profile = [%d:%d]\n", tfa98xx_mixer_profile, prof_idx);
 
 
 	/* update 'real' profile (container profile) */
@@ -2856,7 +2856,7 @@ enum Tfa98xx_Error tfa98xx_adsp_send_calib_values(struct tfa98xx *tfa98xx)
 		bytes[nr++] = (uint8_t)((dsp_cal_value >> 8) & 0xff);
 		bytes[nr++] = (uint8_t)(dsp_cal_value & 0xff);
 
-		dev_err(&tfa98xx->i2c->dev, "%s: cal value 0x%x\n", __func__, dsp_cal_value);
+		dev_dbg(&tfa98xx->i2c->dev, "%s: cal value 0x%x\n", __func__, dsp_cal_value);
 
 		/* Receiver RDC */
 		if (value > 4000)
@@ -2874,7 +2874,7 @@ enum Tfa98xx_Error tfa98xx_adsp_send_calib_values(struct tfa98xx *tfa98xx)
 		bytes[nr++] = (uint8_t)((dsp_cal_value >> 8) & 0xff);
 		bytes[nr++] = (uint8_t)(dsp_cal_value & 0xff);
 
-		dev_err(&tfa98xx->i2c->dev, "%s: cal value 0x%x\n", __func__, dsp_cal_value);
+		dev_dbg(&tfa98xx->i2c->dev, "%s: cal value 0x%x\n", __func__, dsp_cal_value);
 
 		/* Speaker RDC */
 		if (value > 4000)
@@ -2941,7 +2941,7 @@ int tfa98xx_keyreg_print(struct tfa98xx *tfa98xx)
               return -EIO;
        }
 
-       dev_err(&tfa98xx->i2c->dev, "[00h:0x%x],[10h:0x%x],[11h:0x%x],[13h:0x%x],[14h:0x%x],[6eh:0x%x],\n",
+       dev_dbg(&tfa98xx->i2c->dev, "[00h:0x%x],[10h:0x%x],[11h:0x%x],[13h:0x%x],[14h:0x%x],[6eh:0x%x],\n",
               SYS_CONTROL0, STATUS_FLAGS0, STATUS_FLAGS1, STATUS_FLAGS3,STATUS_FLAGS4, STATUS_FLAGS5);
        return 0;
 
@@ -2953,7 +2953,7 @@ static int tfa98xx_mute(struct snd_soc_dai *dai, int mute, int stream)
 	struct snd_soc_codec *codec = dai->codec;
 	struct tfa98xx *tfa98xx = snd_soc_codec_get_drvdata(codec);
 
-	dev_info(&tfa98xx->i2c->dev, "%s: state: %d\n", __func__, mute);
+	dev_dbg(&tfa98xx->i2c->dev, "%s: state: %d\n", __func__, mute);
 
 	if (no_start) {
 		pr_info("no_start parameter set no tfa_dev_start or tfa_dev_stop, returning\n");
@@ -2970,7 +2970,7 @@ static int tfa98xx_mute(struct snd_soc_dai *dai, int mute, int stream)
 			tfa98xx->cstream = 0;
 
 		/* liuhaituo@MM.Audio 2018/7/5 add for debug */
-		pr_err("%s: pstream = %d\n", __func__, tfa98xx->pstream);
+		pr_debug("%s: pstream = %d\n", __func__, tfa98xx->pstream);
 
 		if (tfa98xx->pstream != 0 || tfa98xx->cstream != 0)
 			return 0;
@@ -2985,8 +2985,7 @@ static int tfa98xx_mute(struct snd_soc_dai *dai, int mute, int stream)
 
 		cancel_delayed_work_sync(&tfa98xx->init_work);
 
-
-		pr_err("%s: tfa98xx->dsp_fw_state = %d\n", __func__, tfa98xx->dsp_fw_state);
+		pr_debug("%s: tfa98xx->dsp_fw_state = %d\n", __func__, tfa98xx->dsp_fw_state);
 
 		if (tfa98xx->dsp_fw_state != TFA98XX_DSP_FW_OK)
 			return 0;
@@ -3103,11 +3102,6 @@ static int tfa98xx_probe(struct snd_soc_codec *codec)
 
 	pr_debug("\n");
 
-	/* setup work queue, will be used to initial DSP on first boot up */
-	tfa98xx->tfa98xx_wq = create_singlethread_workqueue("tfa98xx");
-	if (!tfa98xx->tfa98xx_wq)
-		return -ENOMEM;
-
 	INIT_DELAYED_WORK(&tfa98xx->init_work, tfa98xx_dsp_init_work);
 	INIT_DELAYED_WORK(&tfa98xx->monitor_work, tfa98xx_monitor);
 	INIT_DELAYED_WORK(&tfa98xx->interrupt_work, tfa98xx_interrupt);
@@ -3148,9 +3142,6 @@ static int tfa98xx_remove(struct snd_soc_codec *codec)
 	cancel_delayed_work_sync(&tfa98xx->monitor_work);
 	cancel_delayed_work_sync(&tfa98xx->init_work);
 	cancel_delayed_work_sync(&tfa98xx->tapdet_work);
-
-	if (tfa98xx->tfa98xx_wq)
-		destroy_workqueue(tfa98xx->tfa98xx_wq);
 
 	return 0;
 }
@@ -3210,7 +3201,7 @@ static void tfa98xx_irq_tfa2(struct tfa98xx *tfa98xx)
 	 * will be unmasked after handling interrupts in workqueue
 	 */
 	tfa_irq_mask(tfa98xx->tfa);
-	queue_delayed_work(tfa98xx->tfa98xx_wq, &tfa98xx->interrupt_work, 0);
+	queue_delayed_work(system_power_efficient_wq, &tfa98xx->interrupt_work, 0);
 }
 
 
