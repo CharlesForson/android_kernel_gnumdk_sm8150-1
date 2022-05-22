@@ -35,7 +35,6 @@
 #include "dsi_display.h"
 #include "sde_crtc.h"
 #include "sde_rm.h"
-#include "sde_trace.h"
 /**
  * topology is currently defined by a set of following 3 values:
  * 1. num of layer mixers
@@ -44,12 +43,6 @@
  */
 #define TOPOLOGY_SET_LEN 3
 #define MAX_TOPOLOGY 5
-
-#define DSI_PANEL_SAMSUNG_S6E3HC2 0
-#define DSI_PANEL_SAMSUNG_S6E3FC2X01 1
-#define DSI_PANEL_SAMSUNG_SOFEF03F_M 2
-
-#define DSI_PANEL_DEFAULT_LABEL  "Default dsi panel"
 
 #define DEFAULT_MDP_TRANSFER_TIME 14000
 
@@ -260,9 +253,7 @@ const char *gamma_cmd_set_map[DSI_GAMMA_CMD_SET_MAX] = {
 };
 
 int gamma_read_flag = GAMMA_READ_SUCCESS;
-
-char dsi_panel_name = DSI_PANEL_SAMSUNG_S6E3FC2X01;
-EXPORT_SYMBOL(dsi_panel_name);
+int dsi_panel_hw_type = DSI_PANEL_SAMSUNG_S6E3FC2X01;
 
 int dsi_dsc_create_pps_buf_cmd(struct msm_display_dsc_info *dsc, char *buf,
 				int pps_id)
@@ -904,7 +895,7 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 
 	if (panel->is_hbm_enabled) {
 		hbm_finger_print = true;
-		pr_err("HBM is enabled\n");
+		pr_debug("HBM is enabled\n");
 		return 0;
 	}
 
@@ -913,9 +904,9 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 		if (op_dimlayer_bl_enable_real && bl_lvl != 0)
 			bl_lvl = op_dimlayer_bl_alpha;
 		pr_err("dc light %d %d\n", op_dimlayer_bl_enable_real, bl_lvl);
-	}
-	if (op_dimlayer_bl_enable_real && bl_lvl != 0)
+	} else if (op_dimlayer_bl_enable_real && bl_lvl != 0) {
 		bl_lvl = op_dimlayer_bl_alpha;
+	}
 
 	if (panel->bl_config.bl_high2bit) {
 		if (HBM_flag == true)
@@ -942,7 +933,7 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 		}
 
 		rc = mipi_dsi_dcs_set_display_brightness_samsung(dsi, bl_lvl);
-		pr_err("backlight = %d\n", bl_lvl);
+		pr_debug("backlight = %d\n", bl_lvl);
 		cur_backlight = bl_lvl;
 		cur_fps = mode_fps;
 		cur_h = panel->cur_mode->timing.h_active;
@@ -972,6 +963,10 @@ int dsi_panel_op_set_hbm_mode(struct dsi_panel *panel, int level)
 	mutex_lock(&panel->panel_lock);
 
     mode = panel->cur_mode;
+    if (panel->hbm_mode == 5) {
+      level = 1;
+    }
+
     switch (level) {
     case 0:
         count = mode->priv_info->cmd_sets[DSI_CMD_SET_HBM_OFF].count;
@@ -2575,14 +2570,12 @@ static int dsi_panel_parse_misc_features(struct dsi_panel *panel)
 {
 	struct dsi_parser_utils *utils = &panel->utils;
 
-	panel->ulps_feature_enabled =
-		utils->read_bool(utils->data, "qcom,ulps-enabled");
+	panel->ulps_feature_enabled = true;
 
 	pr_info("%s: ulps feature %s\n", __func__,
 		(panel->ulps_feature_enabled ? "enabled" : "disabled"));
 
-	panel->ulps_suspend_enabled =
-		utils->read_bool(utils->data, "qcom,suspend-ulps-enabled");
+	panel->ulps_suspend_enabled = true;
 
 	pr_info("%s: ulps during suspend feature %s", __func__,
 		(panel->ulps_suspend_enabled ? "enabled" : "disabled"));
@@ -3950,20 +3943,23 @@ struct dsi_panel *dsi_panel_get(struct device *parent,
 
 	panel->name = utils->get_property(utils->data,
 				"qcom,mdss-dsi-panel-name", NULL);
+
 	if (strcmp(panel->name, "samsung dsc cmd mode oneplus dsi panel") == 0) {
-		dsi_panel_name = DSI_PANEL_SAMSUNG_S6E3HC2;
+		panel->hw_type = DSI_PANEL_SAMSUNG_S6E3HC2;
+		dsi_panel_hw_type = DSI_PANEL_SAMSUNG_S6E3HC2;
 		pr_err("Dsi panel name is DSI_PANEL_SAMSUNG_S6E3HC2");
-	}
-	else if (strcmp(panel->name, "samsung sofef03f_m fhd cmd mode dsc dsi panel") == 0) {
-		dsi_panel_name = DSI_PANEL_SAMSUNG_SOFEF03F_M;
-		pr_err("Dsi panel name is DSI_PANEL_SAMSUNG_SOFEF03F_M");
-	}
-	else if (strcmp(panel->name, "samsung s6e3fc2x01 cmd mode dsi panel") == 0) {
-		dsi_panel_name = DSI_PANEL_SAMSUNG_S6E3FC2X01;
+	} else if (strcmp(panel->name, "samsung s6e3fc2x01 cmd mode dsi panel") == 0) {
+		panel->hw_type = DSI_PANEL_SAMSUNG_S6E3FC2X01;
+		dsi_panel_hw_type = DSI_PANEL_SAMSUNG_S6E3FC2X01;
 		pr_err("Dsi panel name is DSI_PANEL_SAMSUNG_S6E3FC2X01");
-	}
-	else if (!panel->name)
+	} else if (strcmp(panel->name, "samsung sofef03f_m fhd cmd mode dsc dsi panel") == 0) {
+		panel->hw_type = DSI_PANEL_SAMSUNG_SOFEF03F_M;
+		dsi_panel_hw_type = DSI_PANEL_SAMSUNG_SOFEF03F_M;
+		pr_err("Dsi panel name is DSI_PANEL_SAMSUNG_S6E3FC2X01");
+	} else if (!panel->name) {
+		panel->hw_type = DSI_PANEL_DEFAULT;
 		panel->name = DSI_PANEL_DEFAULT_LABEL;
+	}
 
 	/*
 	 * Set panel type to LCD as default.
@@ -5019,7 +5015,8 @@ int dsi_panel_switch(struct dsi_panel *panel)
 		return -EINVAL;
 	}
 
-	if ((strcmp(panel->name, "samsung dsc cmd mode oneplus dsi panel") != 0) && (strcmp(panel->name, "samsung sofef03f_m fhd cmd mode dsc dsi panel") != 0))
+	if (panel->hw_type != DSI_PANEL_SAMSUNG_S6E3HC2 &&
+	    panel->hw_type != DSI_PANEL_SAMSUNG_SOFEF03F_M)
 		return rc;
 
 	mutex_lock(&panel->panel_lock);
@@ -5030,7 +5027,8 @@ int dsi_panel_switch(struct dsi_panel *panel)
 		       panel->name, rc);
 	pr_err("Send DSI_CMD_SET_TIMING_SWITCH cmds\n");
 	pr_err("panel->cur_mode->timing->h_active = %d\n", panel->cur_mode->timing.h_active);
-	if((strcmp(panel->name, "samsung dsc cmd mode oneplus dsi panel") == 0) && (gamma_read_flag == GAMMA_READ_SUCCESS)) {
+
+	if (gamma_read_flag == GAMMA_READ_SUCCESS) {
 		if (mode_fps == 90) {
 			rc = dsi_panel_tx_gamma_cmd_set(panel, DSI_GAMMA_CMD_SET_SWITCH_90HZ);
 			pr_err("Send DSI_GAMMA_CMD_SET_SWITCH_90HZ cmds\n");
@@ -5086,7 +5084,7 @@ int dsi_panel_enable(struct dsi_panel *panel)
 
 	mutex_lock(&panel->panel_lock);
 	if (panel->aod_mode == 2) {
-		pr_err("Send dsi_panel_set_aod_mode 2 cmds\n");
+		pr_debug("Send dsi_panel_set_aod_mode 2 cmds\n");
 		rc = dsi_panel_set_aod_mode(panel, 2);
 		panel->aod_status = 1;
 	}
@@ -5104,7 +5102,7 @@ int dsi_panel_enable(struct dsi_panel *panel)
 	}
 	panel->need_power_on_backlight = true;
 
-	if ((strcmp(panel->name, "samsung dsc cmd mode oneplus dsi panel") == 0) && (gamma_read_flag == GAMMA_READ_SUCCESS)) {
+	if (panel->hw_type == DSI_PANEL_SAMSUNG_S6E3HC2 && (gamma_read_flag == GAMMA_READ_SUCCESS)) {
 		if (mode_fps == 60) {
 			rc = dsi_panel_tx_gamma_cmd_set(panel, DSI_GAMMA_CMD_SET_SWITCH_60HZ);
 			pr_err("Send DSI_GAMMA_CMD_SET_SWITCH_60HZ cmds\n");
@@ -5122,7 +5120,7 @@ int dsi_panel_enable(struct dsi_panel *panel)
 	notifier_data.id = connector_state_crtc_index;
 	msm_drm_notifier_call_chain(MSM_DRM_EARLY_EVENT_BLANK, &notifier_data);
 	if (panel->aod_mode == 0) {
-		pr_err("Send dsi_panel_set_aod_mode 0 cmds\n");
+		pr_debug("Send dsi_panel_set_aod_mode 0 cmds\n");
 		panel->aod_status = 0;
 		aod_complete = false;
 	}
@@ -5317,8 +5315,8 @@ int dsi_panel_set_hbm_mode(struct dsi_panel *panel, int level)
 			else {
 				HBM_flag = false;
 				rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_HBM_OFF);
-				pr_err("Send DSI_CMD_SET_HBM_OFF cmds.\n");
-				pr_err("hbm_backight = %d, panel->bl_config.bl_level = %d\n",panel->hbm_backlight, panel->bl_config.bl_level);
+				pr_debug("Send DSI_CMD_SET_HBM_OFF cmds.\n");
+				pr_debug("hbm_backight = %d, panel->bl_config.bl_level = %d\n",panel->hbm_backlight, panel->bl_config.bl_level);
 				rc= dsi_panel_update_backlight(panel,panel->hbm_backlight);
 			}
 			break;
@@ -5331,7 +5329,7 @@ int dsi_panel_set_hbm_mode(struct dsi_panel *panel, int level)
 			}
 			else {
 				rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_HBM_ON_1);
-				pr_err("Send DSI_CMD_SET_HBM_ON_1 cmds.\n");
+				pr_debug("Send DSI_CMD_SET_HBM_ON_1 cmds.\n");
 			}
 			break;
 
@@ -5343,7 +5341,7 @@ int dsi_panel_set_hbm_mode(struct dsi_panel *panel, int level)
 			}
 			else {
 				rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_HBM_ON_2);
-				pr_err("Send DSI_CMD_SET_HBM_ON_2 cmds.\n");
+				pr_debug("Send DSI_CMD_SET_HBM_ON_2 cmds.\n");
 			}
 			break;
 
@@ -5355,7 +5353,7 @@ int dsi_panel_set_hbm_mode(struct dsi_panel *panel, int level)
 			}
 			else {
 				rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_HBM_ON_3);
-				pr_err("Send DSI_CMD_SET_HBM_ON_3 cmds.\n");
+				pr_debug("Send DSI_CMD_SET_HBM_ON_3 cmds.\n");
 			}
 			break;
 
@@ -5367,7 +5365,7 @@ int dsi_panel_set_hbm_mode(struct dsi_panel *panel, int level)
 			}
 			else {
 				rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_HBM_ON_4);
-				pr_err("Send DSI_CMD_SET_HBM_ON_4 cmds.\n");
+				pr_debug("Send DSI_CMD_SET_HBM_ON_4 cmds.\n");
 			}
 			break;
 
@@ -5380,7 +5378,7 @@ int dsi_panel_set_hbm_mode(struct dsi_panel *panel, int level)
 			else {
 				HBM_flag = true;
 				rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_HBM_ON_5);
-				pr_err("Send DSI_CMD_SET_HBM_ON_5 cmds.\n");
+				pr_debug("Send DSI_CMD_SET_HBM_ON_5 cmds.\n");
 			}
 			break;
 
@@ -5415,7 +5413,7 @@ int dsi_panel_set_hbm_brightness(struct dsi_panel *panel, int level)
 
 	if (panel->is_hbm_enabled) {
 		hbm_finger_print = true;
-		pr_err("HBM is enabled\n");
+		pr_debug("HBM is enabled\n");
 		return 0;
 	}
 
@@ -5427,7 +5425,7 @@ int dsi_panel_set_hbm_brightness(struct dsi_panel *panel, int level)
 			goto error;
 		}
 		else {
-			pr_err("Send DSI_CMD_SET_HBM_BRIGHTNESS_ON cmds.\n");
+			pr_debug("Send DSI_CMD_SET_HBM_BRIGHTNESS_ON cmds.\n");
 			rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_HBM_BRIGHTNESS_ON);
 			hbm_brightness_flag = 1;
 		}
@@ -5473,7 +5471,7 @@ int dsi_panel_set_acl_mode(struct dsi_panel *panel, int level)
 	}
 	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_ACL_MODE);
 
-    pr_err("Set ACL Mode = %d\n", level);
+    pr_debug("Set ACL Mode = %d\n", level);
 
 error:
 	mutex_unlock(&panel->panel_lock);
@@ -5501,11 +5499,11 @@ int dsi_panel_set_dci_p3_mode(struct dsi_panel *panel, int level)
 
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_DCI_P3_ON);
-            pr_err("DCI-P3 Mode On.\n");
+            pr_debug("DCI-P3 Mode On.\n");
     } else {
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_DCI_P3_OFF);
-            pr_err("DCI-P3 Mode Off.\n");
+            pr_debug("DCI-P3 Mode Off.\n");
     }
 	mutex_unlock(&panel->panel_lock);
 	return rc;
@@ -5527,12 +5525,12 @@ int dsi_panel_set_night_mode(struct dsi_panel *panel, int level)
         count = mode->priv_info->cmd_sets[DSI_CMD_SET_NIGHT_ON].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_NIGHT_ON);
-            pr_err("night Mode On.\n");
+            pr_debug("night Mode On.\n");
     } else {
         count = mode->priv_info->cmd_sets[DSI_CMD_SET_NIGHT_OFF].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_NIGHT_OFF);
-            pr_err("night Mode Off.\n");
+            pr_debug("night Mode Off.\n");
     }
 	mutex_unlock(&panel->panel_lock);
 	return rc;
@@ -5554,12 +5552,12 @@ int dsi_panel_set_native_display_p3_mode(struct dsi_panel *panel, int level)
         count = mode->priv_info->cmd_sets[DSI_CMD_SET_NATIVE_DISPLAY_P3_ON].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_NATIVE_DISPLAY_P3_ON);
-            pr_err("Native Display p3 Mode On.\n");
+            pr_debug("Native Display p3 Mode On.\n");
     } else {
         count = mode->priv_info->cmd_sets[DSI_CMD_SET_NATIVE_DISPLAY_P3_OFF].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_NATIVE_DISPLAY_P3_OFF);
-            pr_err("Native Display p3 Mode Off.\n");
+            pr_debug("Native Display p3 Mode Off.\n");
     }
 	mutex_unlock(&panel->panel_lock);
 return rc;
@@ -5582,12 +5580,12 @@ int dsi_panel_set_native_display_wide_color_mode(struct dsi_panel *panel, int le
         count = mode->priv_info->cmd_sets[DSI_CMD_SET_NATIVE_DISPLAY_WIDE_COLOR_ON].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_NATIVE_DISPLAY_WIDE_COLOR_ON);
-            pr_err("Native wide color Mode On.\n");
+            pr_debug("Native wide color Mode On.\n");
     } else {
         count = mode->priv_info->cmd_sets[DSI_CMD_SET_NATIVE_DISPLAY_WIDE_COLOR_OFF].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_NATIVE_DISPLAY_WIDE_COLOR_OFF);
-            pr_err("Native wide color Mode Off.\n");
+            pr_debug("Native wide color Mode Off.\n");
     }
 	mutex_unlock(&panel->panel_lock);
 return rc;
@@ -5610,12 +5608,12 @@ int dsi_panel_set_native_display_srgb_color_mode(struct dsi_panel *panel, int le
         count = mode->priv_info->cmd_sets[DSI_CMD_SET_NATIVE_DISPLAY_SRGB_COLOR_ON].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_NATIVE_DISPLAY_SRGB_COLOR_ON);
-            pr_err("Native srgb color Mode On.\n");
+            pr_debug("Native srgb color Mode On.\n");
     } else {
         count = mode->priv_info->cmd_sets[DSI_CMD_SET_NATIVE_DISPLAY_SRGB_COLOR_OFF].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_NATIVE_DISPLAY_SRGB_COLOR_OFF);
-            pr_err("Native  srgb color Mode Off.\n");
+            pr_debug("Native  srgb color Mode Off.\n");
     }
 	mutex_unlock(&panel->panel_lock);
 return rc;
@@ -5639,12 +5637,12 @@ int dsi_panel_set_native_loading_effect_mode(struct dsi_panel *panel, int level)
         count = mode->priv_info->cmd_sets[DSI_CMD_LOADING_EFFECT_ON].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_LOADING_EFFECT_ON);
-            pr_err("turn on loading effect\n");
+            pr_debug("turn on loading effect\n");
     } else {
         count = mode->priv_info->cmd_sets[DSI_CMD_LOADING_EFFECT_OFF].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_LOADING_EFFECT_OFF);
-            pr_err("turn off loading effect.\n");
+            pr_debug("turn off loading effect.\n");
     }
 	mutex_unlock(&panel->panel_lock);
 return rc;
@@ -5667,12 +5665,12 @@ int dsi_panel_set_customer_srgb_mode(struct dsi_panel *panel, int level)
         count = mode->priv_info->cmd_sets[DSI_CMD_LOADING_CUSTOMER_RGB_ON].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_LOADING_CUSTOMER_RGB_ON);
-            pr_err("turn on customer srgb\n");
+            pr_debug("turn on customer srgb\n");
     } else {
         count = mode->priv_info->cmd_sets[DSI_CMD_LOADING_CUSTOMER_RGB_OFF].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_LOADING_CUSTOMER_RGB_OFF);
-            pr_err("turn off customer srgb\n");
+            pr_debug("turn off customer srgb\n");
     }
 	mutex_unlock(&panel->panel_lock);
 return rc;
@@ -5695,12 +5693,12 @@ int dsi_panel_set_customer_p3_mode(struct dsi_panel *panel, int level)
         count = mode->priv_info->cmd_sets[DSI_CMD_LOADING_CUSTOMER_P3_ON].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_LOADING_CUSTOMER_P3_ON);
-            pr_err("turn on customer P3\n");
+            pr_debug("turn on customer P3\n");
     } else {
         count = mode->priv_info->cmd_sets[DSI_CMD_LOADING_CUSTOMER_P3_OFF].count;
 
             rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_LOADING_CUSTOMER_P3_OFF);
-            pr_err("turn off customer P3\n");
+            pr_debug("turn off customer P3\n");
     }
 	mutex_unlock(&panel->panel_lock);
 return rc;
@@ -5791,7 +5789,7 @@ int dsi_panel_set_aod_mode(struct dsi_panel *panel, int level)
 					mutex_lock(&panel->panel_lock);
 					rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_AOD_OFF);
 					mutex_unlock(&panel->panel_lock);
-					pr_err("Send DSI_CMD_SET_AOD_OFF cmds\n");
+					pr_debug("Send DSI_CMD_SET_AOD_OFF cmds\n");
 				} else {
 					pr_err("real_aod_mode is %d, aod_fod_flag is %d\n", real_aod_mode, aod_fod_flag);
 				}
@@ -5801,7 +5799,7 @@ int dsi_panel_set_aod_mode(struct dsi_panel *panel, int level)
 					mutex_lock(&panel->panel_lock);
 					rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_AOD_OFF_NEW);
 					mutex_unlock(&panel->panel_lock);
-					pr_err("Send DSI_CMD_SET_AOD_OFF_NEW cmds\n");
+					pr_debug("Send DSI_CMD_SET_AOD_OFF_NEW cmds\n");
 				} else {
 					pr_err("real_aod_mode is %d, aod_fod_flag is %d\n", real_aod_mode, aod_fod_flag);
 				}
@@ -5809,7 +5807,7 @@ int dsi_panel_set_aod_mode(struct dsi_panel *panel, int level)
 					tp_aod_flag = 200;
 					notifier_data.data = &tp_aod_flag;
 					notifier_data.id = MSM_DRM_PRIMARY_DISPLAY;
-					pr_err("set aod state TP flag: %d\n", tp_aod_flag);
+					pr_debug("set aod state TP flag: %d\n", tp_aod_flag);
 					msm_drm_notifier_call_chain(MSM_DRM_EARLY_EVENT_BLANK, &notifier_data);
 				}
 			}
@@ -5844,7 +5842,7 @@ int dsi_panel_send_dsi_panel_command(struct dsi_panel *panel)
 	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_PANEL_COMMAND);
 	if (rc)
 		pr_err("Failed to send dsi panel command\n");
-	pr_err("Send DSI_CMD_SET_PANEL_COMMAND cmds.\n");
+	pr_debug("Send DSI_CMD_SET_PANEL_COMMAND cmds.\n");
 
 error:
 	mutex_unlock(&panel->panel_lock);
